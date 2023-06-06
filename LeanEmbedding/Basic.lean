@@ -66,10 +66,10 @@ def getRawResponse (data : Array String) : EmbeddingM (UInt32 × String × Strin
   let out ← IO.ofExcept stdout.get
   return (exitCode, out, err)
 
-def getIndexedEmbeddings (data : Array String) : EmbeddingM (Array IndexedEmbedding) := do
+def getIndexedEmbeddings (data : Array String) : EmbeddingM (Array (String × Array JsonNumber)) := do
   let (_, rawResponse, _) ← getRawResponse data
   match parseResponse rawResponse with 
-  | .ok (.ok out) => return out
+  | .ok (.ok out) => return out.map fun ⟨i,e⟩ => (data[i]!, e)
   | .ok (.error err) => 
     if err.isServerError then 
       throw <| .userError s!"[EmbeddingM.getIndexedEmbeddings] Server error:\n{err.message}"
