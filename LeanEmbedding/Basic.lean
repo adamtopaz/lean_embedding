@@ -23,7 +23,7 @@ def Error.isServerError (e : Error) : Bool := e.type == "server error"
 def parseResponse (response : String) :
     Except String (Except Error (Array IndexedEmbedding)) := do
   match Json.parse response with
-  | .error e => .error s!"[Embedding.parseResponse]: Error parsing json:¬{e}\n{response}"
+  | .error e => .error s!"[Embedding.parseResponse]: Error parsing json:\n{e}\n{response}"
   | .ok json =>
     if let .ok error := json.getObjValAs? Error "error" then
       pure <| .error error
@@ -90,7 +90,7 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
   match parseResponse rawResponse with 
   | .ok (.ok out) => 
     -- Supposedly the response should be sorted, but just in case...
-    if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with response of size {out.size}."
+    if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with data of size {data.size} and response of size {out.size}."
     return out
   | .ok (.error err) => 
     if err.isServerError then 
