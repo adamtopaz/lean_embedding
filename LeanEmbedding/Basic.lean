@@ -80,8 +80,12 @@ def getIndexedEmbeddings (data : Array String) : EmbeddingM (Array IndexedEmbedd
 
 partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 5) (trace : Bool := false) : 
     EmbeddingM (Array IndexedEmbedding) := do
-  if gas == 0 then return #[]
-  if data.size == 0 then return #[]
+  if gas == 0 then 
+    if trace then IO.println "[EmbeddingM.getEmbeddingsRecursively] Out of gas."
+    return #[]
+  if data.size == 0 then 
+    if trace then IO.println "[EmbeddingM.getEmbeddingsRecursively] Empty input data."
+    return #[]
   let (_, rawResponse, _) ← getRawResponse data
   match parseResponse rawResponse with 
   | .ok (.ok out) => 
@@ -91,7 +95,7 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
   | .ok (.error err) => 
     if err.isServerError then 
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Server error. Retrying with gas = {gas-1}."
-      getIndexedEmbeddingsRecursively data (gas - 1)
+      getIndexedEmbeddingsRecursively data (gas - 1) trace
     else if err.isTokenLimit then 
       let size := data.size
       if size == 1 then 
@@ -101,7 +105,7 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Token limit reached. Retrying with size {newSize}."
       let data1 := data[:newSize].toArray
       let data2 := data[newSize:].toArray
-      return (← getIndexedEmbeddingsRecursively data1) ++ (← getIndexedEmbeddingsRecursively data2)
+      return (← getIndexedEmbeddingsRecursively data1 gas trace) ++ (← getIndexedEmbeddingsRecursively data2 gas trace)
     else 
       if trace then IO.println s!"[EmbeddingM.getIndexedEmbedding] Unknown error. Ignoring."
       return #[]
