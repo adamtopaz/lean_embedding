@@ -79,7 +79,7 @@ def getIndexedEmbeddings (data : Array String) : EmbeddingM (Array IndexedEmbedd
   | .error err => throw <| .userError s!"[EmbeddingM.getIndexedEmbeddings] Failed to parse response:\n{err}"
 
 partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 5) (trace : Bool := false) : 
-    EmbeddingM (Array IndexedEmbedding) := do
+    EmbeddingM (Array (String × Array JsonNumber)) := do
   if gas == 0 then 
     if trace then IO.println "[EmbeddingM.getEmbeddingsRecursively] Out of gas."
     return #[]
@@ -92,7 +92,7 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
     -- Supposedly the response should be sorted, but just in case...
     if trace then 
       IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with data of size {data.size} and response of size {out.size}."
-    return out
+    return out.map fun ⟨i,e⟩ => (data[i]!, e)
   | .ok (.error err) => 
     if err.isServerError then 
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Server error. Retrying with gas = {gas-1}."
