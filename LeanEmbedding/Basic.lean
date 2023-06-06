@@ -91,7 +91,7 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
   | .ok (.ok out) => 
     -- Supposedly the response should be sorted, but just in case...
     if trace then 
-      IO.println rawResponse
+      IO.println <| out.map fun i => i.index
       IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with data of size {data.size} and response of size {out.size}."
     return out
   | .ok (.error err) => 
