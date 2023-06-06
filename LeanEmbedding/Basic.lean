@@ -78,31 +78,20 @@ def getIndexedEmbeddings (data : Array String) : EmbeddingM (Array IndexedEmbedd
     else throw <| .userError s!"[EmbeddingM.getIndexedEmbeddings] Unknown error:\n{toJson err}"
   | .error err => throw <| .userError s!"[EmbeddingM.getIndexedEmbeddings] Failed to parse response:\n{err}"
 
-def getEmbeddings (data : Array String) : EmbeddingM (Array (Array JsonNumber)) := do
-  let (_, rawResponse, _) ← getRawResponse data
-  match parseResponse rawResponse with 
-  | .ok (.ok out) => return (out.qsort fun i j => i.index ≤ j.index).map fun e => e.embedding
-  | .ok (.error err) => 
-    if err.isServerError then 
-      throw <| .userError s!"[EmbeddingM.getEmbeddings] Server error:\n{err.message}"
-    else if err.isTokenLimit then 
-      throw <| .userError s!"[EmbeddingM.getEmbeddings] Surpassed token limit:\n{err.message}"
-    else throw <| .userError s!"[EmbeddingM.getEmbeddings] Unknown error:\n{toJson err}"
-  | .error err => throw <| .userError s!"[EmbeddingM.getEmbeddings] Failed to parse response:\n{err}"
-
-partial def getEmbeddingsRecursively (data : Array String) (gas : Nat := 5) (trace : Bool := false) : 
-    EmbeddingM (Array (Array JsonNumber)) := do
+partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 5) (trace : Bool := false) : 
+    EmbeddingM (Array IndexedEmbedding) := do
   if gas == 0 then return #[]
   if data.size == 0 then return #[]
   let (_, rawResponse, _) ← getRawResponse data
   match parseResponse rawResponse with 
   | .ok (.ok out) => 
     -- Supposedly the response should be sorted, but just in case...
-    return (out.qsort fun i j => i.index ≤ j.index).map fun e => e.embedding
+    if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with response of size {out.size}."
+    return out
   | .ok (.error err) => 
     if err.isServerError then 
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Server error. Retrying with gas = {gas-1}."
-      getEmbeddingsRecursively data (gas - 1)
+      getIndexedEmbeddingsRecursively data (gas - 1)
     else if err.isTokenLimit then 
       let size := data.size
       if size == 1 then 
@@ -112,7 +101,7 @@ partial def getEmbeddingsRecursively (data : Array String) (gas : Nat := 5) (tra
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Token limit reached. Retrying with size {newSize}."
       let data1 := data[:newSize].toArray
       let data2 := data[newSize:].toArray
-      return (← getEmbeddingsRecursively data1) ++ (← getEmbeddingsRecursively data2)
+      return (← getIndexedEmbeddingsRecursively data1) ++ (← getIndexedEmbeddingsRecursively data2)
     else 
       if trace then IO.println s!"[EmbeddingM.getIndexedEmbedding] Unknown error. Ignoring."
       return #[]
