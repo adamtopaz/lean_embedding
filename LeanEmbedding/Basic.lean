@@ -55,7 +55,7 @@ def getRawResponse (data : Array String) : EmbeddingM (UInt32 × String × Strin
   let (stdin, child) ← child.takeStdin
   stdin.putStr <| toString <| toJson <| Json.mkObj [
     ("model","text-embedding-ada-002"),
-    ("input", toString data)
+    ("input", toJson data)
   ]
   stdin.flush 
   let stdout ← IO.asTask child.stdout.readToEnd .dedicated
@@ -91,7 +91,6 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
   | .ok (.ok out) => 
     -- Supposedly the response should be sorted, but just in case...
     if trace then 
-      IO.println <| out.map fun i => i.index
       IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with data of size {data.size} and response of size {out.size}."
     return out
   | .ok (.error err) => 
