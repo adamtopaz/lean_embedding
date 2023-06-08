@@ -79,20 +79,20 @@ def getIndexedEmbeddings (data : Array String) : EmbeddingM (Array IndexedEmbedd
   | .error err => throw <| .userError s!"[EmbeddingM.getIndexedEmbeddings] Failed to parse response:\n{err}"
 
 partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 5) (trace : Bool := false) : 
-    EmbeddingM (Array IndexedEmbedding) := do
+    EmbeddingM (Array (Option (Array JsonNumber))) := do
   if gas == 0 then 
     if trace then IO.println "[EmbeddingM.getEmbeddingsRecursively] Out of gas."
-    return #[]
+    return data.map fun _ => none
   if data.size == 0 then 
     if trace then IO.println "[EmbeddingM.getEmbeddingsRecursively] Empty input data."
     return #[]
   let (_, rawResponse, _) ← getRawResponse data
   match parseResponse rawResponse with 
   | .ok (.ok out) => 
-    -- Supposedly the response should be sorted, but just in case...
     if trace then 
       IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Success with data of size {data.size} and response of size {out.size}."
-    return out
+    -- Supposedly the response should be sorted, but just in case...
+    return out.qsort (fun i j => i.index ≤ j.index) |>.map fun e => some e.embedding
   | .ok (.error err) => 
     if err.isServerError then 
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Server error. Retrying with gas = {gas-1}."
@@ -101,18 +101,18 @@ partial def getIndexedEmbeddingsRecursively (data : Array String) (gas : Nat := 
       let size := data.size
       if size == 1 then 
         if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Token limit reached with size 1. Ignoring."
-        return #[]
+        return data.map fun _ => none
       let newSize := size / 2
       if trace then IO.println s!"[EmbeddingM.getEmbeddingsRecursively] Token limit reached. Retrying with size {newSize}."
       let data1 := data[:newSize].toArray
       let data2 := data[newSize:].toArray
       return (← getIndexedEmbeddingsRecursively data1 gas trace) ++ (← getIndexedEmbeddingsRecursively data2 gas trace)
     else 
-      if trace then IO.println s!"[EmbeddingM.getIndexedEmbedding] Unknown error. Ignoring."
-      return #[]
+      if trace then IO.println s!"[EmbeddingM.getIndexedEmbedding] Unknown error. Retrying with gas = {gas - 1}."
+      getIndexedEmbeddingsRecursively data (gas - 1) trace
   | .error err => 
-      if trace then IO.println s!"[EmbeddingM.getIndexedEmbedding] Failed to parse response:\n{err}"
-      return #[]
+      if trace then IO.println s!"[EmbeddingM.getIndexedEmbedding] Failed to parse response:\n{err}\nRetrying with gas = {gas - 1}"
+      getIndexedEmbeddingsRecursively data (gas - 1) trace
 
 def runWith (m : EmbeddingM α) (apiKey : String) : IO α := do
   ReaderT.run m { apiKey := apiKey }
